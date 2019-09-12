@@ -6,6 +6,7 @@ use kvdb::DBValue;
 use borsh::BorshDeserialize;
 use near_crypto::PublicKey;
 use near_primitives::account::{AccessKey, AccessKeyPermission, FunctionCallPermission};
+use near_primitives::errors::StorageError;
 use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::{ActionReceipt, DataReceiver, Receipt, ReceiptEnum};
 use near_primitives::transaction::{
@@ -87,33 +88,28 @@ impl<'a> RuntimeExt<'a> {
     }
 }
 
+fn wrap_error(error: StorageError) -> ExternalError {
+    ExternalError::StorageError(error.to_string().into_bytes())
+}
+
 impl<'a> External for RuntimeExt<'a> {
     fn storage_set(&mut self, key: &[u8], value: &[u8]) -> Result<Option<Vec<u8>>, ExternalError> {
         let storage_key = self.create_storage_key(key);
-        let evicted = self
-            .trie_update
-            .get(&storage_key)
-            .map_err(|_| ExternalError::StorageError)?
-            .map(DBValue::into_vec);
+        let evicted =
+            self.trie_update.get(&storage_key).map_err(wrap_error)?.map(DBValue::into_vec);
         self.trie_update.set(storage_key, DBValue::from_slice(value));
         Ok(evicted)
     }
 
     fn storage_get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, ExternalError> {
         let storage_key = self.create_storage_key(key);
-        self.trie_update
-            .get(&storage_key)
-            .map_err(|_| ExternalError::StorageError)
-            .map(|opt| opt.map(DBValue::into_vec))
+        self.trie_update.get(&storage_key).map_err(wrap_error).map(|opt| opt.map(DBValue::into_vec))
     }
 
     fn storage_remove(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>, ExternalError> {
         let storage_key = self.create_storage_key(key);
-        let evicted = self
-            .trie_update
-            .get(&storage_key)
-            .map_err(|_| ExternalError::StorageError)?
-            .map(DBValue::into_vec);
+        let evicted =
+            self.trie_update.get(&storage_key).map_err(wrap_error)?.map(DBValue::into_vec);
         self.trie_update.remove(&storage_key);
         Ok(evicted)
     }

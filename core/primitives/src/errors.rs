@@ -1,3 +1,4 @@
+use crate::transaction::Action;
 use crate::types::{AccountId, Balance, Nonce};
 use near_crypto::PublicKey;
 use std::fmt::Display;
@@ -56,6 +57,22 @@ pub enum InvalidAccessKeyError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionError {
+    AccountAlreadyExists(AccountId),
+    AccountDoesNotExist(Action, AccountId),
+    CreateAccountNotAllowed(AccountId, AccountId),
+    ActorNoPermission(AccountId, AccountId, Action),
+    DeleteKeyDoesNotExist(AccountId),
+    AddKeyAlreadyExists(PublicKey),
+    DeleteAccountStaking(AccountId),
+    DeleteAccountHasRent(AccountId, Balance),
+    RentUnpaid(AccountId),
+    TriesToUnstake(AccountId),
+    TriesToStake(AccountId, Balance, Balance, Balance),
+    FunctionCallError(String), // TODO type
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionCallError {
     CompilationError(CompilationError),
     InvalidMethodError(InvalidMethodError),
@@ -107,7 +124,7 @@ pub enum PrepareError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompilationError {
-    CodeDoesNotExist,
+    CodeDoesNotExist(AccountId),
     PrepareError(PrepareError),
     WasmerCompileError,
 }
@@ -216,5 +233,96 @@ where
 {
     fn from(e: T) -> Self {
         InvalidTxErrorOrStorageError::InvalidTxError(e.into())
+    }
+}
+
+impl Display for ActionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            ActionError::AccountAlreadyExists(account_id) => {
+                write!(f, "Can't create a new account {:?}, because it already exists", account_id)
+            }
+            ActionError::AccountDoesNotExist(action, account_id) => write!(
+                f,
+                "Can't complete the action {:?}, because account {:?} doesn't exist",
+                action, account_id
+            ),
+            ActionError::ActorNoPermission(actor_id, account_id, action) => write!(
+                f,
+                "Actor {:?} doesn't have permission to account {:?} to complete the action {:?}",
+                actor_id, account_id, action
+            ),
+            ActionError::RentUnpaid(account_id) => {
+                write!(f, "The account {} wouldn't have enough to pay required rent", account_id)
+            }
+            ActionError::TriesToUnstake(account_id) => {
+                write!(f, "Account {:?} is not yet staked, but tries to unstake", account_id)
+            }
+            ActionError::TriesToStake(account_id, stake, staked, balance) => write!(
+                f,
+                "Account {:?} tries to stake {}, but has staked {} and only has {}",
+                account_id, stake, staked, balance
+            ),
+            ActionError::CreateAccountNotAllowed(account_id, predecessor_id) => write!(
+                f,
+                "The new account_id {:?} can't be created by {:?}",
+                account_id, predecessor_id
+            ),
+            ActionError::DeleteKeyDoesNotExist(account_id) => write!(
+                f,
+                "Account {:?} tries to remove an access key that doesn't exist",
+                account_id
+            ),
+            ActionError::AddKeyAlreadyExists(public_key) => write!(
+                f,
+                "The public key {:?} is already used for an existing access key",
+                public_key
+            ),
+            ActionError::DeleteAccountStaking(account_id) => {
+                write!(f, "Account {:?} is staking, can not be deleted", account_id)
+            }
+            ActionError::DeleteAccountHasRent(account_id, balance) => write!(
+                f,
+                "Account {:?} has {:?}, which is enough to cover the storage rent",
+                account_id, balance
+            ),
+            ActionError::FunctionCallError(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Display for FunctionCallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            FunctionCallError::CompilationError(e) => e.fmt(f),
+            FunctionCallError::InvalidMethodError(e) => e.fmt(f),
+            FunctionCallError::RuntimeError(e) => e.fmt(f),
+        }
+    }
+}
+
+impl Display for CompilationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            CompilationError::CodeDoesNotExist(account_id) => {
+                write!(f, "cannot find contract code for account {}", account_id)
+            }
+            CompilationError::PrepareError(_) => unimplemented!(),
+            CompilationError::WasmerCompileError => unimplemented!(),
+        }
+    }
+}
+
+impl Display for InvalidMethodError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        unimplemented!()
+        //        match self {}
+    }
+}
+
+impl Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        unimplemented!()
+        //        match self {}
     }
 }

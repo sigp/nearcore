@@ -36,7 +36,8 @@ pub enum ExternalError {
     InvalidAccountId,
     InvalidMethodName,
     InvalidPublicKey,
-    StorageError,
+    /// Error from underlying storage, serialized
+    StorageError(Vec<u8>),
 }
 
 pub type Result<T> = ::std::result::Result<T, ExternalError>;
@@ -138,7 +139,7 @@ impl std::fmt::Display for ExternalError {
             InvalidAccountId => write!(f, "VM Logic returned an invalid account id"),
             InvalidMethodName => write!(f, "VM Logic returned an invalid method name"),
             InvalidPublicKey => write!(f, "VM Logic provided an invalid public key"),
-            StorageError => write!(f, "Storage error"),
+            StorageError(e) => write!(f, "Storage error: {:?}", e),
         }
     }
 }

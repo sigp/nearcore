@@ -311,7 +311,7 @@ pub fn get_code(
 pub fn remove_account(
     state_update: &mut TrieUpdate,
     account_id: &AccountId,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), StorageError> {
     state_update.remove(&key_for_account(account_id));
     state_update.remove(&key_for_code(account_id));
     state_update.remove_starts_with(&prefix_for_access_key(account_id))?;

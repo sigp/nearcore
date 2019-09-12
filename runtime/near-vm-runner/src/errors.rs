@@ -1,4 +1,4 @@
-use near_vm_logic::HostError;
+use near_vm_logic::{ExternalError, HostError};
 use wasmer_runtime::error::{CallError, CompileError, CreationError, RuntimeError};
 
 #[derive(Debug, Clone)]
@@ -68,6 +68,8 @@ pub enum VMError {
     MethodEmptyName,
     /// Tried to invoke a method name that was not UTF-8 encoded.
     MethodUTF8Error,
+    /// Storage error
+    StorageError(Vec<u8>),
 }
 
 impl From<PrepareError> for VMError {
@@ -92,6 +94,9 @@ impl From<CallError> for VMError {
     fn from(err: CallError) -> Self {
         if let CallError::Runtime(RuntimeError::Error { data }) = &err {
             if let Some(err) = data.downcast_ref::<HostError>() {
+                if let HostError::External(ExternalError::StorageError(s)) = err {
+                    return VMError::StorageError(s.clone());
+                }
                 return VMError::WasmerCallError(format!("{}", err));
             }
         }

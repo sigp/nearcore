@@ -44,7 +44,7 @@ use crate::config::{
 use crate::ethereum::EthashProvider;
 pub use crate::store::StateRecord;
 use near_primitives::errors::{
-    InvalidAccessKeyError, InvalidTxError, InvalidTxErrorOrStorageError,
+    ActionError, InvalidAccessKeyError, InvalidTxError, InvalidTxErrorOrStorageError,
 };
 
 mod actions;
@@ -88,7 +88,7 @@ pub struct ApplyResult {
 pub struct ActionResult {
     pub gas_burnt: Gas,
     pub gas_used: Gas,
-    pub result: Result<ReturnData, Box<dyn std::error::Error>>,
+    pub result: Result<ReturnData, ActionError>,
     pub logs: Vec<LogEntry>,
     pub new_receipts: Vec<Receipt>,
     pub validator_proposals: Vec<ValidatorStake>,
@@ -434,7 +434,7 @@ impl Runtime {
                     &mut result,
                     account_id,
                     delete_account,
-                );
+                )?;
             }
         };
         Ok(result)
@@ -518,11 +518,7 @@ impl Runtime {
                     set_account(state_update, account_id, account);
                 } else {
                     result.merge(ActionResult {
-                        result: Err(format!(
-                            "`the account {} wouldn't have enough to pay required rent",
-                            account_id
-                        )
-                        .into()),
+                        result: Err(ActionError::RentUnpaid(account_id.clone())),
                         ..Default::default()
                     });
                 }
