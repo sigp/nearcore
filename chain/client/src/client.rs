@@ -30,6 +30,7 @@ use near_network::types::{
 use near_network::{
     NetworkClientMessages, NetworkClientResponses, NetworkRequests, NetworkResponses,
 };
+use near_primitives::errors::InvalidTxErrorOrStorageError;
 use near_primitives::hash::{hash, CryptoHash};
 use near_primitives::merkle::merklize;
 use near_primitives::sharding::ShardChunkHeader;
@@ -1409,7 +1410,10 @@ impl ClientActor {
                     NetworkClientResponses::ForwardTx(validator, valid_transaction.transaction)
                 }
             }
-            Err(err) => NetworkClientResponses::InvalidTx(err.to_string()),
+            Err(InvalidTxErrorOrStorageError::InvalidTxError(err)) => {
+                NetworkClientResponses::InvalidTx(err.to_string())
+            }
+            Err(InvalidTxErrorOrStorageError::StorageError(err)) => panic!(err),
         }
     }
 
