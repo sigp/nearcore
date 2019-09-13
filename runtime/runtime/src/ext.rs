@@ -89,7 +89,9 @@ impl<'a> RuntimeExt<'a> {
 }
 
 fn wrap_error(error: StorageError) -> ExternalError {
-    ExternalError::StorageError(error.to_string().into_bytes())
+    ExternalError::StorageError(
+        borsh::BorshSerialize::try_to_vec(&error).expect("Borsh serialize cannot fail"),
+    )
 }
 
 impl<'a> External for RuntimeExt<'a> {

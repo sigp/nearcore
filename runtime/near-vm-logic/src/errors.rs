@@ -1,6 +1,6 @@
 use crate::dependencies::ExternalError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostError {
     BadUTF16,
     BadUTF8,
@@ -8,10 +8,8 @@ pub enum HostError {
     GasLimitExceeded,
     BalanceExceeded,
     EmptyMethodName,
-    External(ExternalError),
     GuestPanic,
     IntegerOverflow,
-    InvalidIteratorIndex,
     InvalidPromiseIndex,
     CannotAppendActionToJointPromise,
     CannotReturnJointPromise,
@@ -19,11 +17,36 @@ pub enum HostError {
     InvalidRegisterId,
     IteratorWasInvalidated,
     MemoryAccessViolation,
+    InvalidReceiptIndex,
+    InvalidIteratorIndex,
+    InvalidAccountId,
+    InvalidMethodName,
+    InvalidPublicKey,
 }
 
-impl From<ExternalError> for HostError {
+#[derive(Debug, Clone, PartialEq)]
+pub enum HostErrorOrStorageError {
+    HostError(HostError),
+    /// Error from underlying storage, serialized
+    StorageError(Vec<u8>),
+}
+
+impl From<HostError> for HostErrorOrStorageError {
+    fn from(err: HostError) -> Self {
+        HostErrorOrStorageError::HostError(err)
+    }
+}
+
+impl From<ExternalError> for HostErrorOrStorageError {
     fn from(err: ExternalError) -> Self {
-        HostError::External(err)
+        match err {
+            ExternalError::InvalidReceiptIndex => HostError::InvalidReceiptIndex.into(),
+            ExternalError::InvalidIteratorIndex => HostError::InvalidIteratorIndex.into(),
+            ExternalError::InvalidAccountId => HostError::InvalidAccountId.into(),
+            ExternalError::InvalidMethodName => HostError::InvalidMethodName.into(),
+            ExternalError::InvalidPublicKey => HostError::InvalidPublicKey.into(),
+            ExternalError::StorageError(e) => HostErrorOrStorageError::StorageError(e),
+        }
     }
 }
 
@@ -37,10 +60,6 @@ impl std::fmt::Display for HostError {
             GasLimitExceeded => write!(f, "Exceeded the maximum amount of gas allowed to burn per contract."),
             BalanceExceeded => write!(f, "Exceeded the account balance."),
             EmptyMethodName => write!(f, "Tried to call an empty method name."),
-            External(ext) => {
-                write!(f, "External error: ")?;
-                ext.fmt(f)
-            },
             GuestPanic => write!(f, "Smart contract has explicitly invoked `panic`."),
             IntegerOverflow => write!(f, "Integer overflow."),
             InvalidIteratorIndex => write!(f, "Invalid iterator index"),
@@ -51,6 +70,11 @@ impl std::fmt::Display for HostError {
             InvalidRegisterId => write!(f, "Accessed invalid register id"),
             IteratorWasInvalidated => write!(f, "Iterator was invalidated after its creation by performing a mutable operation on trie"),
             MemoryAccessViolation => write!(f, "Accessed memory outside the bounds."),
+            InvalidReceiptIndex => write!(f, "VM Logic returned an invalid receipt index"),
+            InvalidAccountId => write!(f, "VM Logic returned an invalid account id"),
+            InvalidMethodName => write!(f, "VM Logic returned an invalid method name"),
+            InvalidPublicKey => write!(f, "VM Logic provided an invalid public key"),
+//            StorageError(e) => write!(f, "Storage error: {:?}", e),
         }
     }
 }

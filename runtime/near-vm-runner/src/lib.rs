@@ -1,5 +1,5 @@
 mod cache;
-mod errors;
+pub mod errors;
 mod imports;
 mod memory;
 mod prepare;

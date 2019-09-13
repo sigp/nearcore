@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 
-use crate::errors::VMError;
+use crate::errors::{FunctionCallError, MethodResolveError, VMError};
 use crate::memory::WasmerMemory;
 use crate::{cache, imports};
 use near_vm_logic::types::PromiseResult;
@@ -16,7 +16,12 @@ pub fn run<'a>(
     promise_results: &'a [PromiseResult],
 ) -> (Option<VMOutcome>, Option<VMError>) {
     if method_name.is_empty() {
-        return (None, Some(VMError::MethodEmptyName));
+        return (
+            None,
+            Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
+                MethodResolveError::MethodEmptyName,
+            ))),
+        );
     }
 
     let module = match cache::compile_cached_module(code_hash, code, config) {
@@ -25,7 +30,7 @@ pub fn run<'a>(
     };
     let mut memory = match WasmerMemory::new(config) {
         Ok(x) => x,
-        Err(err) => return (None, Some(err)),
+        Err(err) => panic!("Cannot create memory for a contract call"),
     };
     let memory_copy = memory.clone();
 
@@ -36,7 +41,14 @@ pub fn run<'a>(
 
     let method_name = match std::str::from_utf8(method_name) {
         Ok(x) => x,
-        Err(_) => return (None, Some(VMError::MethodUTF8Error)),
+        Err(_) => {
+            return (
+                None,
+                Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
+                    MethodResolveError::MethodUTF8Error,
+                ))),
+            )
+        }
     };
 
     match module.instantiate(&import_object) {
@@ -44,6 +56,6 @@ pub fn run<'a>(
             Ok(_) => (Some(logic.outcome()), None),
             Err(err) => (Some(logic.outcome()), Some(err.into())),
         },
-        Err(err) => (None, Some(VMError::WasmerInstantiateError(format!("{}", err)))),
+        Err(err) => (None, Some(err.into())),
     }
 }

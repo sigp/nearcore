@@ -1,7 +1,41 @@
-use near_vm_logic::{ExternalError, HostError};
-use wasmer_runtime::error::{CallError, CompileError, CreationError, RuntimeError};
+use near_vm_logic::{ExternalError, HostError, HostErrorOrStorageError};
+use std::fmt::Display;
+use wasmer_runtime::error::{
+    CallError, CompileError, CreationError, ResolveError as WasmerResolveError,
+    RuntimeError as WasmerRuntimeError, RuntimeError,
+};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VMError {
+    FunctionCallError(FunctionCallError),
+    StorageError(Vec<u8>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FunctionCallError {
+    CompilationError(CompilationError),
+    LinkError(String),
+    ResolveError(MethodResolveError),
+    WasmTrap(String),
+    HostError(HostError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MethodResolveError {
+    MethodEmptyName,
+    MethodUTF8Error,
+    MethodNotFound,
+    MethodInvalidSignature,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompilationError {
+    CodeDoesNotExist(String),
+    PrepareError(PrepareError),
+    WasmerCompileError(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Error that can occur while preparing or executing Wasm smart-contract.
 pub enum PrepareError {
     /// Error happened while serializing the module.
@@ -33,6 +67,84 @@ pub enum PrepareError {
     Memory,
 }
 
+impl From<wasmer_runtime::error::Error> for VMError {
+    fn from(err: wasmer_runtime::error::Error) -> Self {
+        use wasmer_runtime::error::Error;
+        match err {
+            Error::CompileError(err) => err.into(),
+            Error::LinkError(err) => VMError::FunctionCallError(FunctionCallError::LinkError(
+                format!("{}", Error::LinkError(err)),
+            )),
+            Error::RuntimeError(err) => err.into(),
+            Error::ResolveError(err) => err.into(),
+            Error::CallError(err) => err.into(),
+            Error::CreationError(err) => panic!(err),
+        }
+    }
+}
+
+impl From<CallError> for VMError {
+    fn from(err: CallError) -> Self {
+        match err {
+            CallError::Resolve(err) => err.into(),
+            CallError::Runtime(err) => err.into(),
+        }
+    }
+}
+
+impl From<CompileError> for VMError {
+    fn from(err: CompileError) -> Self {
+        VMError::FunctionCallError(FunctionCallError::CompilationError(
+            CompilationError::WasmerCompileError(err.to_string()),
+        ))
+    }
+}
+
+impl From<WasmerResolveError> for VMError {
+    fn from(err: WasmerResolveError) -> Self {
+        match err {
+            WasmerResolveError::Signature { .. } => VMError::FunctionCallError(
+                FunctionCallError::ResolveError(MethodResolveError::MethodInvalidSignature),
+            ),
+            WasmerResolveError::ExportNotFound { .. } => VMError::FunctionCallError(
+                FunctionCallError::ResolveError(MethodResolveError::MethodNotFound),
+            ),
+            WasmerResolveError::ExportWrongType { .. } => VMError::FunctionCallError(
+                FunctionCallError::ResolveError(MethodResolveError::MethodNotFound),
+            ),
+        }
+    }
+}
+
+impl From<RuntimeError> for VMError {
+    fn from(err: WasmerRuntimeError) -> Self {
+        match err {
+            WasmerRuntimeError::Trap { msg } => {
+                VMError::FunctionCallError(FunctionCallError::WasmTrap(msg.to_string()))
+            }
+            WasmerRuntimeError::Error { data } => {
+                let err = data
+                    .downcast_ref::<HostErrorOrStorageError>()
+                    .expect("Expect HostErrorOrStorageError");
+                match err {
+                    HostErrorOrStorageError::StorageError(s) => VMError::StorageError(s.clone()),
+                    HostErrorOrStorageError::HostError(h) => {
+                        VMError::FunctionCallError(FunctionCallError::HostError(h.clone()))
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl From<PrepareError> for VMError {
+    fn from(err: PrepareError) -> Self {
+        VMError::FunctionCallError(FunctionCallError::CompilationError(
+            CompilationError::PrepareError(err),
+        ))
+    }
+}
+
 impl std::fmt::Display for PrepareError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         use PrepareError::*;
@@ -50,56 +162,38 @@ impl std::fmt::Display for PrepareError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-/// Error that occurs when trying to run a method from a smart contract.
-/// TODO handling for StorageError
-pub enum VMError {
-    /// Error occurs during the preparation of smart contract.
-    PrepareError(String),
-    /// Error that occurs when creating memory for Wasmer to run.
-    WasmerMemoryCreation(String),
-    /// Error that occurs when compiling prepared Wasm with Wasmer.
-    WasmerCompileError(String),
-    /// Instantiates a Wasm module can raise an error, if `start` function is specified.
-    WasmerInstantiateError(String),
-    /// Error when calling a method using Wasmer, includes errors raised by the host functions.
-    WasmerCallError(String),
-    /// Tried to invoke method using empty name.
-    MethodEmptyName,
-    /// Tried to invoke a method name that was not UTF-8 encoded.
-    MethodUTF8Error,
-    /// Storage error
-    StorageError(Vec<u8>),
-}
-
-impl From<PrepareError> for VMError {
-    fn from(err: PrepareError) -> Self {
-        VMError::PrepareError(format!("{}", err))
-    }
-}
-
-impl From<CompileError> for VMError {
-    fn from(err: CompileError) -> Self {
-        VMError::WasmerCompileError(format!("{}", err))
-    }
-}
-
-impl From<CreationError> for VMError {
-    fn from(err: CreationError) -> Self {
-        VMError::WasmerMemoryCreation(format!("{}", err))
-    }
-}
-
-impl From<CallError> for VMError {
-    fn from(err: CallError) -> Self {
-        if let CallError::Runtime(RuntimeError::Error { data }) = &err {
-            if let Some(err) = data.downcast_ref::<HostError>() {
-                if let HostError::External(ExternalError::StorageError(s)) = err {
-                    return VMError::StorageError(s.clone());
-                }
-                return VMError::WasmerCallError(format!("{}", err));
-            }
+impl Display for FunctionCallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            FunctionCallError::CompilationError(e) => e.fmt(f),
+            FunctionCallError::ResolveError(e) => e.fmt(f),
+            FunctionCallError::HostError(e) => e.fmt(f),
+            FunctionCallError::LinkError(s) => write!(f, "{}", s),
+            FunctionCallError::WasmTrap(s) => write!(f, "WebAssembly trap: {}", s),
         }
-        VMError::WasmerCallError(format!("{}", err))
+    }
+}
+
+impl Display for CompilationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            CompilationError::CodeDoesNotExist(account_id) => {
+                write!(f, "cannot find contract code for account {}", account_id)
+            }
+            CompilationError::PrepareError(p) => write!(f, "PrepareError: {}", p),
+            CompilationError::WasmerCompileError(s) => write!(f, "Wasmer compilation error: {}", s),
+        }
+    }
+}
+
+impl Display for MethodResolveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl Display for VMError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        std::fmt::Debug::fmt(self, f)
     }
 }

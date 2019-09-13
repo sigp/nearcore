@@ -12,5 +12,6 @@ pub use config::Config;
 pub use context::VMContext;
 pub use dependencies::{External, ExternalError, MemoryLike};
 pub use errors::HostError;
+pub use errors::HostErrorOrStorageError;
 pub use logic::{VMLogic, VMOutcome};
 pub use types::ReturnData;

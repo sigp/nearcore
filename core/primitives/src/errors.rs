@@ -1,10 +1,11 @@
 use crate::transaction::Action;
 use crate::types::{AccountId, Balance, Nonce};
+use borsh::{BorshDeserialize, BorshSerialize};
 use near_crypto::PublicKey;
 use std::fmt::Display;
 
 /// Internal
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub enum StorageError {
     /// Key-value db internal failure
     StorageInternalError,
@@ -27,14 +28,14 @@ impl std::fmt::Display for StorageError {
 impl std::error::Error for StorageError {}
 
 /// Internal
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GasOverflowError;
 /// Internal
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct BalanceOverflowError;
 
 /// External
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InvalidTxError {
     InvalidSigner(AccountId),
     SignerDoesNotExist(AccountId),
@@ -47,7 +48,7 @@ pub enum InvalidTxError {
     CostOverflow,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InvalidAccessKeyError {
     AccessKeyNotFound(AccountId, PublicKey),
     ReceiverMismatch(AccountId, AccountId),
@@ -56,7 +57,7 @@ pub enum InvalidAccessKeyError {
     NotEnoughAllowance(AccountId, PublicKey, Balance, Balance),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ActionError {
     AccountAlreadyExists(AccountId),
     AccountDoesNotExist(Action, AccountId),
@@ -70,63 +71,6 @@ pub enum ActionError {
     TriesToUnstake(AccountId),
     TriesToStake(AccountId, Balance, Balance, Balance),
     FunctionCallError(String), // TODO type
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FunctionCallError {
-    CompilationError(CompilationError),
-    InvalidMethodError(InvalidMethodError),
-    RuntimeError(RuntimeError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InvalidMethodError {
-    MethodEmptyName,
-    MethodUTF8Error,
-    MethodNotFound,
-    MethodInvalidSignature,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RuntimeError {
-    BadUTF16,
-    BadUTF8,
-    GasExceeded,
-    GasLimitExceeded,
-    BalanceExceeded,
-    EmptyMethodName,
-
-    InvalidReceiptIndex,
-    InvalidAccountId,
-    InvalidMethodName,
-
-    GuestPanic,
-    IntegerOverflow,
-    InvalidIteratorIndex,
-    InvalidPromiseIndex,
-    CannotReturnJointPromise,
-    InvalidPromiseResultIndex,
-    InvalidRegisterId,
-    IteratorWasInvalidated,
-    MemoryAccessViolation,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PrepareError {
-    Serialization,
-    Deserialization,
-    InternalMemoryDeclared,
-    GasInstrumentation,
-    StackHeightInstrumentation,
-    Instantiate,
-    Memory,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CompilationError {
-    CodeDoesNotExist(AccountId),
-    PrepareError(PrepareError),
-    WasmerCompileError,
 }
 
 impl Display for InvalidTxError {
@@ -288,41 +232,5 @@ impl Display for ActionError {
             ),
             ActionError::FunctionCallError(s) => write!(f, "{}", s),
         }
-    }
-}
-
-impl Display for FunctionCallError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            FunctionCallError::CompilationError(e) => e.fmt(f),
-            FunctionCallError::InvalidMethodError(e) => e.fmt(f),
-            FunctionCallError::RuntimeError(e) => e.fmt(f),
-        }
-    }
-}
-
-impl Display for CompilationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            CompilationError::CodeDoesNotExist(account_id) => {
-                write!(f, "cannot find contract code for account {}", account_id)
-            }
-            CompilationError::PrepareError(_) => unimplemented!(),
-            CompilationError::WasmerCompileError => unimplemented!(),
-        }
-    }
-}
-
-impl Display for InvalidMethodError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        unimplemented!()
-        //        match self {}
-    }
-}
-
-impl Display for RuntimeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        unimplemented!()
-        //        match self {}
     }
 }

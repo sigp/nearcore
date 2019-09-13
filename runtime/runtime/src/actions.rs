@@ -25,7 +25,7 @@ use near_vm_logic::VMContext;
 use crate::config::RuntimeConfig;
 use crate::ext::RuntimeExt;
 use crate::{ActionResult, ApplyState};
-use near_primitives::errors::{ActionError, CompilationError, FunctionCallError};
+use near_primitives::errors::ActionError;
 use near_vm_runner::VMError;
 
 /// Number of epochs it takes to unstake.
@@ -166,10 +166,12 @@ pub(crate) fn action_function_call(
     );
     if let Some(err) = err {
         if let VMError::StorageError(storage) = err {
-            return Err(StorageError::StorageInternalError); // TODO
+            return Err(
+                borsh::BorshDeserialize::try_from_slice(&storage).expect("Borsh cannot fail")
+            );
         }
         result.result = Err(ActionError::FunctionCallError(format!(
-            "wasm async call execution failed with error: {:?}",
+            "wasm async call execution failed with error: {}",
             err
         )));
         // TODO
