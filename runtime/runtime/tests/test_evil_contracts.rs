@@ -73,15 +73,18 @@ fn test_evil_deep_recursion() {
     [100, 1000, 10000, 100000, 1000000].iter().for_each(|n| {
         println!("{}", n);
         let n = *n as u64;
-        let n = n.to_le_bytes().to_vec();
         let res = node.user().function_call(
             "alice.near".to_string(),
             "test_contract".to_string(),
             "recurse",
-            n,
+            n.to_le_bytes().to_vec(),
             FUNCTION_CALL_GAS_AMOUNT,
             0,
         );
-        assert_eq!(res.status, FinalTransactionStatus::Completed, "{:?}", res);
+        if n <= 10000 {
+            assert_eq!(res.status, FinalTransactionStatus::Completed, "{:?}", res);
+        } else {
+            assert_eq!(res.status, FinalTransactionStatus::Failed, "{:?}", res);
+        }
     });
 }

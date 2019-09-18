@@ -1,10 +1,13 @@
 use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{Config, VMContext, VMOutcome};
+use near_vm_runner::errors::FunctionCallError;
 use near_vm_runner::{run, VMError};
 use std::fs;
 use std::mem::size_of;
 use std::path::PathBuf;
+
+mod utils;
 
 fn assert_run_result((outcome, err): (Option<VMOutcome>, Option<VMError>), expected_value: u64) {
     if let Some(_) = err {
@@ -25,11 +28,6 @@ fn assert_run_result((outcome, err): (Option<VMOutcome>, Option<VMError>), expec
     }
 }
 
-const CURRENT_ACCOUNT_ID: &str = "alice";
-const SIGNER_ACCOUNT_ID: &str = "bob";
-const SIGNER_ACCOUNT_PK: [u8; 3] = [0, 1, 2];
-const PREDECESSOR_ACCOUNT_ID: &str = "carol";
-
 fn arr_u64_to_u8(value: &[u64]) -> Vec<u8> {
     let mut res = vec![];
     for el in value {
@@ -40,21 +38,7 @@ fn arr_u64_to_u8(value: &[u64]) -> Vec<u8> {
 
 fn create_context(input: &[u64]) -> VMContext {
     let input = arr_u64_to_u8(input);
-    VMContext {
-        current_account_id: CURRENT_ACCOUNT_ID.to_owned(),
-        signer_account_id: SIGNER_ACCOUNT_ID.to_owned(),
-        signer_account_pk: Vec::from(&SIGNER_ACCOUNT_PK[..]),
-        predecessor_account_id: PREDECESSOR_ACCOUNT_ID.to_owned(),
-        input,
-        block_index: 0,
-        account_balance: 0,
-        storage_usage: 0,
-        attached_deposit: 0,
-        prepaid_gas: 10u64.pow(9),
-        random_seed: vec![0, 1, 2],
-        free_of_charge: false,
-        output_data_receivers: vec![],
-    }
+    crate::utils::create_context(input)
 }
 
 #[test]
@@ -83,4 +67,30 @@ pub fn test_read_write() {
     let result =
         run(vec![], &code, b"read_value", &mut fake_external, context, &config, &promise_results);
     assert_run_result(result, 20);
+}
+
+#[test]
+pub fn test_out_of_memory() {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests/res/test_contract_rs.wasm");
+    let code = fs::read(path).unwrap();
+    let mut fake_external = MockedExternal::new();
+
+    let context = create_context(&[]);
+    let config = Config::default();
+
+    let promise_results = vec![];
+    let result = run(
+        vec![],
+        &code,
+        b"out_of_memory",
+        &mut fake_external,
+        context,
+        &config,
+        &promise_results,
+    );
+    assert_eq!(
+        result.1,
+        Some(VMError::FunctionCallError(FunctionCallError::WasmTrap("unknown".to_string())))
+    );
 }

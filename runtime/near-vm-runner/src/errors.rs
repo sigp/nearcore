@@ -1,5 +1,5 @@
 use near_vm_logic::{ExternalError, HostError, HostErrorOrStorageError};
-use std::fmt::Display;
+use std::fmt;
 use wasmer_runtime::error::{
     CallError, CompileError, CreationError, ResolveError as WasmerResolveError,
     RuntimeError as WasmerRuntimeError, RuntimeError,
@@ -118,19 +118,27 @@ impl From<WasmerResolveError> for VMError {
 
 impl From<RuntimeError> for VMError {
     fn from(err: WasmerRuntimeError) -> Self {
-        match err {
+        match &err {
             WasmerRuntimeError::Trap { msg } => {
                 VMError::FunctionCallError(FunctionCallError::WasmTrap(msg.to_string()))
             }
             WasmerRuntimeError::Error { data } => {
-                let err = data
-                    .downcast_ref::<HostErrorOrStorageError>()
-                    .expect("Expect HostErrorOrStorageError");
-                match err {
-                    HostErrorOrStorageError::StorageError(s) => VMError::StorageError(s.clone()),
-                    HostErrorOrStorageError::HostError(h) => {
-                        VMError::FunctionCallError(FunctionCallError::HostError(h.clone()))
+                if let Some(err) = data.downcast_ref::<HostErrorOrStorageError>() {
+                    match err {
+                        HostErrorOrStorageError::StorageError(s) => {
+                            VMError::StorageError(s.clone())
+                        }
+                        HostErrorOrStorageError::HostError(h) => {
+                            VMError::FunctionCallError(FunctionCallError::HostError(h.clone()))
+                        }
                     }
+                } else {
+                    eprintln!(
+                        "Bad error case! Output is non-deterministic {:?} {:?}",
+                        data.type_id(),
+                        err.to_string()
+                    );
+                    VMError::FunctionCallError(FunctionCallError::WasmTrap("unknown".to_string()))
                 }
             }
         }
@@ -145,8 +153,8 @@ impl From<PrepareError> for VMError {
     }
 }
 
-impl std::fmt::Display for PrepareError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl fmt::Display for PrepareError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         use PrepareError::*;
         match self {
             Serialization => write!(f, "Error happened while serializing the module."),
@@ -162,8 +170,8 @@ impl std::fmt::Display for PrepareError {
     }
 }
 
-impl Display for FunctionCallError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl fmt::Display for FunctionCallError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             FunctionCallError::CompilationError(e) => e.fmt(f),
             FunctionCallError::ResolveError(e) => e.fmt(f),
@@ -174,8 +182,8 @@ impl Display for FunctionCallError {
     }
 }
 
-impl Display for CompilationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl fmt::Display for CompilationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             CompilationError::CodeDoesNotExist(account_id) => {
                 write!(f, "cannot find contract code for account {}", account_id)
@@ -186,14 +194,14 @@ impl Display for CompilationError {
     }
 }
 
-impl Display for MethodResolveError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        std::fmt::Debug::fmt(self, f)
+impl fmt::Display for MethodResolveError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt::Debug::fmt(self, f)
     }
 }
 
-impl Display for VMError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        std::fmt::Debug::fmt(self, f)
+impl fmt::Display for VMError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt::Debug::fmt(self, f)
     }
 }

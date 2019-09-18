@@ -56,6 +56,6 @@ pub fn run<'a>(
             Ok(_) => (Some(logic.outcome()), None),
             Err(err) => (Some(logic.outcome()), Some(err.into())),
         },
-        Err(err) => (None, Some(err.into())),
+        Err(err) => (Some(logic.outcome()), Some(err.into())),
     }
 }
