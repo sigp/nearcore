@@ -1,4 +1,4 @@
-use crate::errors::VMError;
+use near_vm_errors::VMError;
 use near_vm_logic::{Config, MemoryLike};
 use wasmer_runtime::units::{Bytes, Pages};
 use wasmer_runtime::wasm::MemoryDescriptor;

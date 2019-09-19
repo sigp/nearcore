@@ -1,8 +1,9 @@
 use std::ffi::c_void;
 
-use crate::errors::{FunctionCallError, MethodResolveError, VMError};
+use crate::errors::IntoVMError;
 use crate::memory::WasmerMemory;
 use crate::{cache, imports};
+use near_vm_errors::{FunctionCallError, MethodResolveError, VMError};
 use near_vm_logic::types::PromiseResult;
 use near_vm_logic::{Config, External, VMContext, VMLogic, VMOutcome};
 
@@ -30,7 +31,7 @@ pub fn run<'a>(
     };
     let mut memory = match WasmerMemory::new(config) {
         Ok(x) => x,
-        Err(err) => panic!("Cannot create memory for a contract call"),
+        Err(_err) => panic!("Cannot create memory for a contract call"),
     };
     let memory_copy = memory.clone();
 
@@ -54,8 +55,8 @@ pub fn run<'a>(
     match module.instantiate(&import_object) {
         Ok(instance) => match instance.call(&method_name, &[]) {
             Ok(_) => (Some(logic.outcome()), None),
-            Err(err) => (Some(logic.outcome()), Some(err.into())),
+            Err(err) => (Some(logic.outcome()), Some(err.into_vm_error())),
         },
-        Err(err) => (Some(logic.outcome()), Some(err.into())),
+        Err(err) => (Some(logic.outcome()), Some(err.into_vm_error())),
     }
 }

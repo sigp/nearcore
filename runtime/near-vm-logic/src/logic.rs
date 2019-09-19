@@ -1,11 +1,11 @@
 use crate::config::Config;
 use crate::context::VMContext;
 use crate::dependencies::{External, MemoryLike};
-use crate::errors::{HostError, HostErrorOrStorageError};
 use crate::types::{
     AccountId, Balance, Gas, IteratorIndex, PromiseIndex, PromiseResult, ReceiptIndex, ReturnData,
     StorageUsage,
 };
+use crate::{HostError, HostErrorOrStorageError};
 use near_runtime_fees::Fee;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

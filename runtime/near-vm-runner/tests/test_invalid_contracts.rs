@@ -1,5 +1,5 @@
 use crate::utils::{make_simple_contract_call, wat2wasm_no_validate};
-use near_vm_runner::errors::{CompilationError, FunctionCallError, PrepareError};
+use near_vm_errors::{CompilationError, FunctionCallError, PrepareError};
 use near_vm_runner::VMError;
 
 mod utils;

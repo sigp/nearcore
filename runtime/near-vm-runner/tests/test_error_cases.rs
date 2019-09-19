@@ -1,8 +1,6 @@
 use crate::utils::make_simple_contract_call;
+use near_vm_errors::{CompilationError, FunctionCallError, MethodResolveError, PrepareError};
 use near_vm_logic::{HostError, ReturnData, VMOutcome};
-use near_vm_runner::errors::{
-    CompilationError, FunctionCallError, MethodResolveError, PrepareError,
-};
 use near_vm_runner::VMError;
 
 mod utils;

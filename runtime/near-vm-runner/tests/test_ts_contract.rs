@@ -1,7 +1,7 @@
+use near_vm_errors::FunctionCallError;
 use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{Config, External, HostError, VMContext};
-use near_vm_runner::errors::FunctionCallError;
 use near_vm_runner::{run, VMError};
 use std::fs;
 use std::path::PathBuf;
