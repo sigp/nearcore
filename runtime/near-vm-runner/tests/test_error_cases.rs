@@ -42,13 +42,14 @@ fn test_infinite_initializer() {
 }
 
 #[test]
-// Current behavior is to run the initializer even if the method doesn't exist
 fn test_infinite_initializer_export_not_found() {
     assert_eq!(
         make_simple_contract_call(&infinite_initializer_contract(), b"hello2"),
         (
-            Some(vm_outcome_with_gas(1000000)),
-            Some(VMError::FunctionCallError(FunctionCallError::HostError(HostError::GasExceeded)))
+            None,
+            Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
+                MethodResolveError::MethodNotFound
+            )))
         )
     );
 }
@@ -79,7 +80,7 @@ fn test_export_not_found() {
     assert_eq!(
         make_simple_contract_call(&simple_contract(), b"hello2"),
         (
-            Some(vm_outcome_with_gas(0)),
+            None,
             Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
                 MethodResolveError::MethodNotFound
             )))
@@ -177,7 +178,7 @@ fn test_wrong_signature_contract() {
     assert_eq!(
         make_simple_contract_call(&wrong_signature_contract(), b"hello"),
         (
-            Some(vm_outcome_with_gas(0)),
+            None,
             Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
                 MethodResolveError::MethodInvalidSignature
             )))
@@ -201,7 +202,7 @@ fn test_export_wrong_type() {
     assert_eq!(
         make_simple_contract_call(&export_wrong_type(), b"hello"),
         (
-            Some(vm_outcome_with_gas(0)),
+            None,
             Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
                 MethodResolveError::MethodNotFound
             )))
@@ -250,7 +251,7 @@ fn test_stack_overflow() {
     assert_eq!(
         make_simple_contract_call(&stack_overflow(), b"hello"),
         (
-            Some(vm_outcome_with_gas(129870)),
+            Some(vm_outcome_with_gas(65536)),
             Some(VMError::FunctionCallError(FunctionCallError::WasmTrap("unknown".to_string())))
         )
     );

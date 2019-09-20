@@ -1,5 +1,5 @@
 use crate::utils::{make_simple_contract_call, wat2wasm_no_validate};
-use near_vm_errors::{CompilationError, FunctionCallError, PrepareError};
+use near_vm_errors::{CompilationError, FunctionCallError, MethodResolveError, PrepareError};
 use near_vm_runner::VMError;
 
 mod utils;
@@ -49,6 +49,45 @@ fn test_function_not_defined_contract() {
             None,
             Some(VMError::FunctionCallError(FunctionCallError::CompilationError(
                 CompilationError::PrepareError(PrepareError::StackHeightInstrumentation)
+            )))
+        ))
+    );
+}
+
+fn function_type_not_defined_contract(bad_type: u64) -> Vec<u8> {
+    wat2wasm_no_validate(&format!(
+        r#"
+            (module
+              (func (;0;) (type {}))
+              (export "hello" (func 0))
+            )"#,
+        bad_type
+    ))
+}
+
+#[test]
+fn test_function_type_not_defined_contract_1() {
+    assert_eq!(
+        make_simple_contract_call(&function_type_not_defined_contract(1), b"hello"),
+        ((
+            None,
+            Some(VMError::FunctionCallError(FunctionCallError::CompilationError(
+                CompilationError::PrepareError(PrepareError::StackHeightInstrumentation)
+            )))
+        ))
+    );
+}
+
+#[test]
+// Weird case. It's not valid wasm (wat2wasm validate will fail), but wasmer allows it.
+fn test_function_type_not_defined_contract_2() {
+    let wasm = function_type_not_defined_contract(0);
+    assert_eq!(
+        make_simple_contract_call(&function_type_not_defined_contract(0), b"hello"),
+        ((
+            None,
+            Some(VMError::FunctionCallError(FunctionCallError::ResolveError(
+                MethodResolveError::MethodInvalidSignature
             )))
         ))
     );
